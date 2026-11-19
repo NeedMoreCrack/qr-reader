@@ -1,0 +1,1 @@
+<a>https://needmorecrack.github.io/qr-reader/</a>
