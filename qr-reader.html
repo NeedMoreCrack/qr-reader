@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>QR Code 圖片解析器</title>
+  <style>
+    :root { color-scheme: dark; --bg:#080d18; --panel:#121b2c; --panel-2:#18253a; --border:#30415d; --text:#edf3ff; --muted:#a7b7cf; --primary:#6ee7cf; --primary-text:#062b25; --danger:#ffb4ad; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif; background:radial-gradient(ellipse at top,#1b2a43 0%,var(--bg) 65%); color:var(--text); min-height:100vh; }
+    .container { width:min(100% - 32px,1020px); margin:0 auto; padding:clamp(24px,5vw,56px) 0 60px; }
+    header { margin-bottom:26px; }
+    .eyebrow { color:var(--primary); font-size:.78rem; font-weight:750; letter-spacing:.12em; }
+    h1 { font-size:clamp(1.65rem,5vw,2.7rem); line-height:1.2; margin:10px 0; }
+    .lead { color:var(--muted); line-height:1.8; margin:0; font-size:.95rem; }
+    .grid { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:stretch; }
+    .card { border:1px solid var(--border); border-radius:20px; padding:clamp(18px,3vw,26px); background:var(--panel); min-width:0; }
+    .card h2 { font-size:1.1rem; margin:0 0 17px; }
+    .dropzone { min-height:188px; border:2px dashed #536981; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; text-align:center; padding:22px 16px; cursor:pointer; background:#142137; transition:border-color .2s,background .2s; }
+    .dropzone:hover,.dropzone.dragover,.dropzone:focus-visible { border-color:var(--primary); background:#1b3440; outline:none; }
+    .dropzone .glyph { font-size:2.4rem; }
+    .dropzone strong { font-size:1rem; }
+    .dropzone small,.hint { color:var(--muted); font-size:.83rem; line-height:1.65; }
+    .field { display:flex; flex-direction:column; gap:9px; margin:10px 0 14px; }
+    label { color:var(--muted); font-size:.88rem; }
+    input[type=url] { border-radius:11px; padding:14px 13px; min-width:0; width:100%; background:#0b1425; border:1px solid #52617a; color:var(--text); font-size:1rem; }
+    input[type=url]:focus-visible,button:focus-visible,textarea:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+    button { font:inherit; border:0; cursor:pointer; border-radius:11px; padding:12px 17px; background:var(--primary); color:var(--primary-text); font-weight:700; min-height:46px; }
+    button:hover:not(:disabled) { filter:brightness(1.06); }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .button-secondary { background:#293b54; color:var(--text); border:1px solid #4a5c76; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .actions button { flex:1; }
+    .results { margin-top:18px; }
+    .results h2 { margin-bottom:14px; }
+    .status { padding:12px 14px; background:#1b2b42; border-radius:12px; font-size:.9rem; line-height:1.6; color:var(--muted); margin-bottom:16px; overflow-wrap:anywhere; }
+    .status.error { color:var(--danger); background:#3b2330; }
+    .status.success { color:#92f0d1; background:#163a35; }
+    .preview { width:100%; min-height:165px; max-height:320px; object-fit:contain; background:#0b1425; border-radius:12px; border:1px solid var(--border); display:none; margin:0 0 16px; }
+    .placeholder { background:#0b1425; border:1px solid var(--border); border-radius:12px; min-height:165px; display:flex; justify-content:center; align-items:center; color:var(--muted); margin-bottom:16px; text-align:center; padding:18px; }
+    textarea { color:var(--text); border:1px solid var(--border); border-radius:12px; background:#0b1425; width:100%; padding:14px; font:inherit; line-height:1.7; resize:vertical; min-height:125px; overflow-wrap:anywhere; }
+    .result-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .result-head label { font-weight:650; }
+    .copy { padding:8px 13px; min-height:38px; font-size:.85rem; }
+    .footnote { color:var(--muted); line-height:1.8; font-size:.84rem; margin-top:18px; }
+    .footnote code { color:#a4f3e4; }
+    .hidden { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }
+    @media (max-width:720px) { .grid { grid-template-columns:1fr; } .container { width:min(100% - 24px,600px); padding-top:24px; } .card { border-radius:16px; } .dropzone { min-height:160px; } }
+    @media (max-width:380px) { .actions { flex-direction:column; } .actions button { width:100%; } }
+    @media (prefers-reduced-motion:reduce) { * { transition:none!important; } }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <div class="eyebrow">QR DECODER · LOCAL PROCESSING</div>
+      <h1>QR Code 圖片解析器</h1>
+      <p class="lead">上傳圖片、拖曳檔案或貼上圖片網址，直接讀取 QR Code 裡的文字或連結。支援電腦、平板與手機。</p>
+    </header>
+    <div class="grid">
+      <section class="card" aria-labelledby="uploadTitle">
+        <h2 id="uploadTitle">① 上傳圖片</h2>
+        <input id="fileInput" class="hidden" type="file" accept="image/*" />
+        <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="選擇或拖曳 QR Code 圖片">
+          <span class="glyph" aria-hidden="true">▧</span>
+          <strong>點擊選擇圖片</strong>
+          <small>電腦也可以拖曳圖片到這裡<br />支援 JPG、PNG、WebP 等瀏覽器可讀取的圖片</small>
+        </div>
+        <p class="hint">小技巧：也能用 <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>V</kbd> 直接貼上截圖。</p>
+      </section>
+      <section class="card" aria-labelledby="urlTitle">
+        <h2 id="urlTitle">② 從圖片網址解析</h2>
+        <form id="urlForm">
+          <div class="field">
+            <label for="imageUrl">圖片網址（https://...）</label>
+            <input id="imageUrl" type="url" inputmode="url" placeholder="https://example.com/qr.png" autocomplete="url" required />
+          </div>
+          <div class="actions">
+            <button id="urlButton" type="submit">載入並解析</button>
+            <button id="clearButton" type="button" class="button-secondary">清除</button>
+          </div>
+        </form>
+        <p class="hint">注意：網址必須是可存取的圖片，且伺服器須允許跨來源讀取（CORS）。不能繞過其他網站的存取限制。</p>
+      </section>
+    </div>
+    <section class="card results" aria-labelledby="resultsTitle">
+      <h2 id="resultsTitle">③ 解析結果</h2>
+      <div id="status" class="status" role="status" aria-live="polite">尚未選擇圖片。</div>
+      <div id="placeholder" class="placeholder">圖片預覽會顯示在這裡</div>
+      <img id="preview" class="preview" alt="待解析的 QR Code 圖片預覽" />
+      <div class="result-head">
+        <label for="resultText">QR Code 原始內容</label>
+        <button id="copyButton" class="button-secondary copy" type="button" disabled>複製內容</button>
+      </div>
+      <textarea id="resultText" readonly placeholder="辨識完成後會顯示文字、網址或其他資料"></textarea>
+    </section>
+    <p class="footnote">隱私說明：選擇本機圖片時，圖片只在目前瀏覽器內解析，不會上傳到本工具的伺服器。網址模式會向指定的圖片伺服器提出請求。初次使用需要連線載入 <code>jsQR</code> 解碼函式庫；若要完全離線，可將該函式庫另存本機並修改引用路徑。</p>
+  </main>
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const urlForm = document.getElementById('urlForm');
+    const imageUrl = document.getElementById('imageUrl');
+    const urlButton = document.getElementById('urlButton');
+    const clearButton = document.getElementById('clearButton');
+    const statusBox = document.getElementById('status');
+    const preview = document.getElementById('preview');
+    const placeholder = document.getElementById('placeholder');
+    const resultText = document.getElementById('resultText');
+    const copyButton = document.getElementById('copyButton');
+    let previewUrl = null;
+    let job = 0;
+    const MAX_BYTES = 25 * 1024 * 1024;
+    function status(message, type = '') {
+      statusBox.textContent = message;
+      statusBox.className = 'status' + (type ? ' ' + type : '');
+    }
+    function releasePreview() {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      preview.removeAttribute('src');
+      preview.style.display = 'none';
+      placeholder.style.display = 'flex';
+    }
+    function reset(message = '尚未選擇圖片。') {
+      job++;
+      fileInput.value = '';
+      resultText.value = '';
+      copyButton.disabled = true;
+      releasePreview();
+      status(message);
+      urlButton.disabled = false;
+    }
+    function checkReady() {
+      if (typeof jsQR !== 'function') throw new Error('解碼函式庫載入失敗，請確認網路連線或 CDN 是否遭到封鎖。');
+    }
+    async function decodeBlob(blob) {
+      if (!blob.type.startsWith('image/')) throw new Error('取得的不是圖片資料，請提供直接指向圖片的網址或圖片檔案。');
+      if (blob.size > MAX_BYTES) throw new Error('圖片超過 25 MB，請縮小檔案再試。');
+      const bitmap = await createImageBitmap(blob);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('無法建立 Canvas 影像處理環境。');
+        ctx.drawImage(bitmap, 0, 0);
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        return jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'attemptBoth' });
+      } finally {
+        bitmap.close();
+      }
+    }
+    async function showBlob(blob, ticket) {
+      checkReady();
+      const decoded = await decodeBlob(blob);
+      if (ticket !== job) return;
+      releasePreview();
+      previewUrl = URL.createObjectURL(blob);
+      preview.src = previewUrl;
+      preview.style.display = 'block';
+      placeholder.style.display = 'none';
+      if (decoded) {
+        resultText.value = decoded.data;
+        copyButton.disabled = !decoded.data;
+        status('解析成功！已讀取 QR Code 內容。', 'success');
+      } else {
+        status('找不到可辨識的 QR Code，請確認圖片清晰、完整且包含 QR Code。', 'error');
+      }
+    }
+    async function handleFile(file) {
+      if (!file) return;
+      reset('正在解析本機圖片…');
+      const ticket = job;
+      try { await showBlob(file, ticket); }
+      catch (error) { if (ticket === job) status(error.message || '無法解析圖片。', 'error'); }
+    }
+    fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropzone.classList.remove('dragover');
+      handleFile(e.dataTransfer.files[0]);
+    });
+    document.addEventListener('paste', (e) => {
+      if (document.activeElement === imageUrl) return;
+      const item = [...(e.clipboardData?.items || [])].find(x => x.type.startsWith('image/'));
+      if (item) { e.preventDefault(); handleFile(item.getAsFile()); }
+    });
+    urlForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = imageUrl.value.trim();
+      let url;
+      try {
+        url = new URL(input);
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('請輸入 HTTP 或 HTTPS 圖片網址。');
+      } catch (err) { status(err.message || '網址格式不正確。', 'error'); return; }
+      reset('正在下載並解析圖片…');
+      const ticket = job;
+      urlButton.disabled = true;
+      try {
+        const response = await fetch(url.href, { mode: 'cors', credentials: 'omit' });
+        if (!response.ok) throw new Error(`圖片下載失敗：HTTP ${response.status}`);
+        const len = Number(response.headers.get('content-length'));
+        if (len > MAX_BYTES) throw new Error('圖片超過 25 MB，請縮小檔案再試。');
+        const blob = await response.blob();
+        if (ticket === job) await showBlob(blob, ticket);
+      } catch (error) {
+        if (ticket === job) {
+          const corsHint = error instanceof TypeError ? '無法讀取圖片網址，可能是跨來源存取（CORS）、網路或連線限制。請下載圖片後改用上傳功能。' : (error.message || '無法讀取圖片。');
+          status(corsHint, 'error');
+        }
+      } finally { if (ticket === job) urlButton.disabled = false; }
+    });
+    clearButton.addEventListener('click', () => { imageUrl.value = ''; reset(); });
+    copyButton.addEventListener('click', async () => {
+      if (!resultText.value) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(resultText.value);
+        } else {
+          resultText.focus(); resultText.select();
+          if (!document.execCommand('copy')) throw new Error('瀏覽器不支援自動複製。');
+        }
+        status('已複製解析結果。', 'success');
+      } catch { status('無法自動複製，請選取結果文字手動複製。', 'error'); }
+    });
+  </script>
+</body>
+</html>
