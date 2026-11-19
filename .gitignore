@@ -1,0 +1,34 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node.js (if tooling is introduced later)
+node_modules/
+.npm/
+.npmrc.local
+
+# Temporary files and logs
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+.cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Generated build/test output (if introduced later)
+dist/
+build/
+coverage/

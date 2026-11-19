@@ -77,8 +77,8 @@
     @media (max-width:720px) { .generator-layout { grid-template-columns:1fr; } .qr-preview-wrap { min-height:230px; } }
     @media (max-width:420px) { .inline-fields { grid-template-columns:1fr; } .generated-actions { grid-template-columns:1fr; } }
   </style>
-  <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script defer src="./vendor/jsQR.js"></script>
+  <script defer src="./vendor/qrcode.js"></script>
 </head>
 <body>
   <main class="container">
@@ -184,7 +184,7 @@
         </section>
       </div>
     </div>
-    <p class="footnote">隱私說明：選擇本機圖片時，圖片只在目前瀏覽器內解析，不會上傳到本工具的伺服器。網址模式會向指定的圖片伺服器提出請求。初次使用需要連線載入 <code>jsQR</code> 與 <code>qrcode</code> 函式庫；若要完全離線，可將該函式庫另存本機並修改引用路徑。</p>
+    <p class="footnote">隱私說明：選擇本機圖片時，圖片只在目前瀏覽器內解析，不會上傳到本工具的伺服器。網址模式會向指定的圖片伺服器提出請求。函式庫採用本機檔案 <code>vendor/jsQR.js</code> 和 <code>vendor/qrcode.js</code>。將兩個檔案一併提交到 Git 後，clone 下來即可離線解析與產生 QR Code。網址圖片解析仍需要網路，並受 CORS 限制。</p>
   </main>
   <script>
     const fileInput = document.getElementById('fileInput');
@@ -222,7 +222,7 @@
       urlButton.disabled = false;
     }
     function checkReady() {
-      if (typeof jsQR !== 'function') throw new Error('解碼函式庫載入失敗，請確認網路連線或 CDN 是否遭到封鎖。');
+      if (typeof jsQR !== 'function') throw new Error('解碼函式庫未找到，請確認 vendor/jsQR.js 存在。');
     }
     async function decodeBlob(blob) {
       if (!blob.type.startsWith('image/')) throw new Error('取得的不是圖片資料，請提供直接指向圖片的網址或圖片檔案。');
@@ -435,7 +435,7 @@
     }
     $('generateButton').addEventListener('click', async () => {
       if (!window.QRCode?.toCanvas || !window.QRCode?.toString) {
-        genStatus('QR Code 產生函式庫載入失敗，請檢查網路連線。', 'error');
+        genStatus('產生函式庫未找到，請確認 vendor/qrcode.js 存在。', 'error');
         return;
       }
       const ticket = ++lastGeneration;
