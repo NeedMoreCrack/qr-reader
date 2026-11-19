@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <title>QR Code 圖片解析器</title>
+  <title>QR Code 工具箱｜解析與產生</title>
   <style>
     :root { color-scheme: dark; --bg:#080d18; --panel:#121b2c; --panel-2:#18253a; --border:#30415d; --text:#edf3ff; --muted:#a7b7cf; --primary:#6ee7cf; --primary-text:#062b25; --danger:#ffb4ad; }
     * { box-sizing:border-box; }
@@ -49,16 +49,49 @@
     @media (max-width:720px) { .grid { grid-template-columns:1fr; } .container { width:min(100% - 24px,600px); padding-top:24px; } .card { border-radius:16px; } .dropzone { min-height:160px; } }
     @media (max-width:380px) { .actions { flex-direction:column; } .actions button { width:100%; } }
     @media (prefers-reduced-motion:reduce) { * { transition:none!important; } }
+    .tabs { display:flex; gap:8px; padding:6px; background:#101a2d; border:1px solid var(--border); border-radius:15px; margin:22px 0; }
+    .tab { background:transparent; color:var(--muted); flex:1; }
+    .tab.active { background:var(--primary); color:var(--primary-text); }
+    .tab-panel[hidden], .dynamic-fields[hidden] { display:none!important; }
+    .generator-layout { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr); gap:18px; align-items:start; }
+    .generator-layout .card { height:100%; }
+    .form-group { display:flex; flex-direction:column; gap:7px; margin-bottom:15px; }
+    .form-group label { font-weight:600; }
+    input[type=text],input[type=email],input[type=tel],input[type=number],select,.editable { width:100%; min-width:0; color:var(--text); background:#0b1425; border:1px solid #52617a; border-radius:11px; padding:12px 13px; font:inherit; }
+    select { color-scheme:dark; }
+    .editable { min-height:120px; resize:vertical; }
+    input[type=color] { width:100%; height:46px; background:#0b1425; border:1px solid #52617a; border-radius:11px; padding:5px; cursor:pointer; }
+    .inline-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .qr-preview-wrap { background:#edf3ff; min-height:260px; display:flex; align-items:center; justify-content:center; border-radius:14px; padding:22px; overflow:hidden; }
+    #generatedCanvas { display:none; max-width:100%; height:auto; image-rendering:auto; }
+    .preview-help { color:#52617a; text-align:center; font-size:.9rem; }
+    .generated-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:15px; }
+    .generated-actions button { padding:10px; }
+    .checkbox-line { display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--muted); margin-bottom:12px; }
+    .checkbox-line input { width:18px; height:18px; accent-color:var(--primary); }
+    .helper { font-size:.82rem; color:var(--muted); line-height:1.6; margin:8px 0; }
+    .verify { font-size:.88rem; padding:11px 13px; line-height:1.6; border-radius:11px; background:#1b2b42; color:var(--muted); margin-top:12px; overflow-wrap:anywhere; }
+    .verify.success { color:#92f0d1; background:#163a35; }
+    .verify.error { color:var(--danger); background:#3b2330; }
+    button:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+    @media (max-width:720px) { .generator-layout { grid-template-columns:1fr; } .qr-preview-wrap { min-height:230px; } }
+    @media (max-width:420px) { .inline-fields { grid-template-columns:1fr; } .generated-actions { grid-template-columns:1fr; } }
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 </head>
 <body>
   <main class="container">
     <header>
-      <div class="eyebrow">QR DECODER · LOCAL PROCESSING</div>
-      <h1>QR Code 圖片解析器</h1>
-      <p class="lead">上傳圖片、拖曳檔案或貼上圖片網址，直接讀取 QR Code 裡的文字或連結。支援電腦、平板與手機。</p>
+      <div class="eyebrow">QR TOOLBOX · LOCAL PROCESSING</div>
+      <h1>QR Code 工具箱</h1>
+      <p class="lead">解析圖片中的 QR Code，也能產生自己的 QR Code，支援電腦、平板及手機。全部在瀏覽器端進行。</p>
     </header>
+    <nav class="tabs" role="tablist" aria-label="工具模式">
+      <button type="button" class="tab active" id="decodeTab" role="tab" aria-selected="true" aria-controls="decodePanel">解析 QR Code</button>
+      <button type="button" class="tab" id="generateTab" role="tab" aria-selected="false" aria-controls="generatePanel">產生 QR Code</button>
+    </nav>
+    <div class="tab-panel" id="decodePanel" role="tabpanel" aria-labelledby="decodeTab">
     <div class="grid">
       <section class="card" aria-labelledby="uploadTitle">
         <h2 id="uploadTitle">① 上傳圖片</h2>
@@ -96,7 +129,62 @@
       </div>
       <textarea id="resultText" readonly placeholder="辨識完成後會顯示文字、網址或其他資料"></textarea>
     </section>
-    <p class="footnote">隱私說明：選擇本機圖片時，圖片只在目前瀏覽器內解析，不會上傳到本工具的伺服器。網址模式會向指定的圖片伺服器提出請求。初次使用需要連線載入 <code>jsQR</code> 解碼函式庫；若要完全離線，可將該函式庫另存本機並修改引用路徑。</p>
+    </div>
+    <div class="tab-panel" id="generatePanel" role="tabpanel" aria-labelledby="generateTab" hidden>
+      <div class="generator-layout">
+        <section class="card" aria-labelledby="generatorTitle">
+          <h2 id="generatorTitle">① 輸入 QR Code 內容</h2>
+          <div class="form-group"><label for="contentType">內容類型</label>
+            <select id="contentType">
+              <option value="text">一般文字</option>
+              <option value="url">網址 URL</option>
+              <option value="wifi">Wi-Fi 連線</option>
+              <option value="email">Email</option>
+              <option value="phone">電話號碼</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div id="textFields" class="dynamic-fields"><div class="form-group"><label for="plainText">文字內容</label><textarea id="plainText" class="editable" placeholder="輸入要轉成 QR Code 的文字或網址"></textarea></div></div>
+          <div id="urlFields" class="dynamic-fields" hidden><div class="form-group"><label for="urlText">網址</label><input id="urlText" type="url" inputmode="url" placeholder="https://example.com"></div></div>
+          <div id="wifiFields" class="dynamic-fields" hidden>
+            <div class="form-group"><label for="wifiSsid">Wi-Fi 名稱 (SSID)</label><input id="wifiSsid" type="text" autocomplete="off" placeholder="我的 Wi-Fi"></div>
+            <div class="form-group"><label for="wifiPassword">Wi-Fi 密碼</label><input id="wifiPassword" type="text" autocomplete="off" placeholder="至少 8 個字元（依網路設定）"></div>
+            <div class="form-group"><label for="wifiSecurity">安全性</label><select id="wifiSecurity"><option value="WPA">WPA / WPA2 / WPA3 Personal</option><option value="WEP">WEP（舊式）</option><option value="nopass">無密碼</option></select></div>
+            <label class="checkbox-line"><input id="wifiHidden" type="checkbox"> 隱藏網路名稱（Hidden SSID）</label>
+          </div>
+          <div id="emailFields" class="dynamic-fields" hidden>
+            <div class="form-group"><label for="emailTo">收件人 Email</label><input id="emailTo" type="email" placeholder="hello@example.com"></div>
+            <div class="form-group"><label for="emailSubject">主旨（選填）</label><input id="emailSubject" type="text" placeholder="信件主旨"></div>
+            <div class="form-group"><label for="emailBody">內容（選填）</label><textarea id="emailBody" class="editable" placeholder="信件內容"></textarea></div>
+          </div>
+          <div id="phoneFields" class="dynamic-fields" hidden><div class="form-group"><label for="phoneNumber">電話號碼</label><input id="phoneNumber" type="tel" placeholder="+886912345678"></div></div>
+          <div id="jsonFields" class="dynamic-fields" hidden><div class="form-group"><label for="jsonText">JSON 內容</label><textarea id="jsonText" class="editable" spellcheck="false" placeholder='{"name":"Andy"}'></textarea></div></div>
+          <h2>② 圖片設定</h2>
+          <div class="inline-fields">
+            <div class="form-group"><label for="qrSize">尺寸 (px)</label><select id="qrSize"><option value="256">256 × 256</option><option value="512" selected>512 × 512</option><option value="1024">1024 × 1024</option><option value="2048">2048 × 2048</option></select></div>
+            <div class="form-group"><label for="qrErrorLevel">容錯等級</label><select id="qrErrorLevel"><option value="L">L（約 7%）</option><option value="M" selected>M（約 15%）</option><option value="Q">Q（約 25%）</option><option value="H">H（約 30%）</option></select></div>
+            <div class="form-group"><label for="qrDark">前景顏色</label><input id="qrDark" type="color" value="#000000"></div>
+            <div class="form-group"><label for="qrLight">背景顏色</label><input id="qrLight" type="color" value="#ffffff"></div>
+          </div>
+          <p class="helper">建議使用深色前景、淺色背景，並保留白邊，讓手機更容易掃描。</p>
+          <button id="generateButton" type="button" style="width:100%">產生 QR Code</button>
+        </section>
+        <section class="card" aria-labelledby="generatedTitle">
+          <h2 id="generatedTitle">③ QR Code 預覽與下載</h2>
+          <div class="qr-preview-wrap"><span id="generatedPlaceholder" class="preview-help">輸入內容後按「產生 QR Code」</span><canvas id="generatedCanvas" aria-label="產生的 QR Code"></canvas></div>
+          <div id="generatorStatus" class="verify" role="status" aria-live="polite">尚未產生 QR Code。</div>
+          <div class="generated-actions">
+            <button id="downloadPng" type="button" disabled>下載 PNG</button>
+            <button id="downloadSvg" type="button" class="button-secondary" disabled>下載 SVG</button>
+            <button id="copyGenerated" type="button" class="button-secondary" disabled>複製原始內容</button>
+            <button id="verifyGenerated" type="button" class="button-secondary" disabled>重新驗證</button>
+          </div>
+          <div class="form-group" style="margin-top:18px"><label for="generatedText">實際編碼內容</label><textarea id="generatedText" readonly placeholder="產生後顯示 QR Code 實際儲存的資料"></textarea></div>
+          <p class="helper">驗證會使用解析函式庫重新辨識產生的圖片，並比對原始資料。Wi-Fi、Email 等將轉成相容的文字格式。</p>
+        </section>
+      </div>
+    </div>
+    <p class="footnote">隱私說明：選擇本機圖片時，圖片只在目前瀏覽器內解析，不會上傳到本工具的伺服器。網址模式會向指定的圖片伺服器提出請求。初次使用需要連線載入 <code>jsQR</code> 與 <code>qrcode</code> 函式庫；若要完全離線，可將該函式庫另存本機並修改引用路徑。</p>
   </main>
   <script>
     const fileInput = document.getElementById('fileInput');
@@ -230,6 +318,181 @@
         }
         status('已複製解析結果。', 'success');
       } catch { status('無法自動複製，請選取結果文字手動複製。', 'error'); }
+    });
+
+    // QR Code Generator: no server is required for image generation.
+    const $ = id => document.getElementById(id);
+    const decodeTab = $('decodeTab'), generateTab = $('generateTab');
+    function switchTab(generating) {
+      decodeTab.classList.toggle('active', !generating);
+      generateTab.classList.toggle('active', generating);
+      decodeTab.setAttribute('aria-selected', String(!generating));
+      generateTab.setAttribute('aria-selected', String(generating));
+      $('decodePanel').hidden = generating;
+      $('generatePanel').hidden = !generating;
+    }
+    decodeTab.addEventListener('click', () => switchTab(false));
+    generateTab.addEventListener('click', () => switchTab(true));
+    const contentTypes = ['text', 'url', 'wifi', 'email', 'phone', 'json'];
+    $('contentType').addEventListener('change', () => {
+      for (const type of contentTypes) $(type+'Fields').hidden = $('contentType').value !== type;
+      invalidateGenerated();
+    });
+    $('wifiSecurity').addEventListener('change', () => {
+      $('wifiPassword').disabled = $('wifiSecurity').value === 'nopass';
+      invalidateGenerated();
+    });
+    let generatedPayload = null;
+    let lastGeneration = 0;
+    function genStatus(message, type='') {
+      const target = $('generatorStatus');
+      target.textContent = message;
+      target.className = 'verify' + (type ? ' '+type : '');
+    }
+    function invalidateGenerated() {
+      generatedPayload = null;
+      lastGeneration++;
+      $('generatedCanvas').style.display = 'none';
+      $('generatedPlaceholder').style.display = 'block';
+      $('generatedText').value = '';
+      for (const id of ['downloadPng', 'downloadSvg', 'copyGenerated', 'verifyGenerated']) $(id).disabled = true;
+      genStatus('設定已變更，請重新產生 QR Code。');
+    }
+    const generatorInputs = document.querySelectorAll('#generatePanel input, #generatePanel textarea, #generatePanel select');
+    generatorInputs.forEach(el => {
+      if (el.id !== 'contentType' && el.id !== 'wifiSecurity') {
+        el.addEventListener('input', invalidateGenerated);
+        el.addEventListener('change', invalidateGenerated);
+      }
+    });
+    function wifiEscape(str) { return str.replace(/([\\;,:\"])/g, '\\$1'); }
+    function makePayload() {
+      const value = id => $(id).value;
+      switch (value('contentType')) {
+        case 'url': {
+          const url = value('urlText').trim();
+          let parsed;
+          try { parsed = new URL(url); } catch { throw new Error('請輸入有效的網址。'); }
+          if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('目前僅支援 HTTP / HTTPS 網址。');
+          return url;
+        }
+        case 'wifi': {
+          const ssid = value('wifiSsid');
+          if (!ssid) throw new Error('請輸入 Wi-Fi 名稱。');
+          const sec = value('wifiSecurity');
+          const pass = sec === 'nopass' ? '' : value('wifiPassword');
+          if (sec !== 'nopass' && !pass) throw new Error('請輸入 Wi-Fi 密碼。');
+          return `WIFI:T:${sec};S:${wifiEscape(ssid)};P:${wifiEscape(pass)};H:${$('wifiHidden').checked ? 'true':'false'};;`;
+        }
+        case 'email': {
+          const to = value('emailTo').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error('請輸入有效的 Email 地址。');
+          const qs = new URLSearchParams();
+          if (value('emailSubject')) qs.set('subject', value('emailSubject'));
+          if (value('emailBody')) qs.set('body', value('emailBody'));
+          return 'mailto:' + to + (qs.toString() ? '?' + qs.toString() : '');
+        }
+        case 'phone': {
+          const phone = value('phoneNumber').trim();
+          if (!/^\+?[0-9()\-\s]{5,30}$/.test(phone)) throw new Error('請輸入有效的電話號碼。');
+          return 'tel:' + phone.replace(/[()\-\s]/g, '');
+        }
+        case 'json': {
+          const json = value('jsonText').trim();
+          try { JSON.parse(json); } catch { throw new Error('JSON 格式不正確，請檢查括號、引號與逗號。'); }
+          return json;
+        }
+        default: {
+          const text = value('plainText');
+          if (!text.trim()) throw new Error('請輸入要產生 QR Code 的文字。');
+          return text;
+        }
+      }
+    }
+    function qrSettings() {
+      return {
+        width: Number($('qrSize').value),
+        margin: 4,
+        errorCorrectionLevel: $('qrErrorLevel').value,
+        color: {dark: $('qrDark').value, light: $('qrLight').value}
+      };
+    }
+    function scanGenerated(payload) {
+      if (typeof jsQR !== 'function') return { ok: null, message: '已產生，但解碼函式庫尚未載入，無法自動驗證。' };
+      try {
+        const canvas = $('generatedCanvas');
+        const ctx = canvas.getContext('2d', {willReadFrequently:true});
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const res = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
+        return res && res.data === payload
+          ? { ok: true, message: '✓ 驗證成功：重新解碼後的內容與輸入完全一致。' }
+          : { ok: false, message: '⚠ 無法驗證：請改用黑色前景、白色背景，或降低內容長度。' };
+      } catch (err) { return {ok:false, message:'驗證失敗：' + err.message}; }
+    }
+    function showVerification(payload) {
+      const result = scanGenerated(payload);
+      genStatus(result.message, result.ok === true ? 'success' : result.ok === false ? 'error' : '');
+    }
+    $('generateButton').addEventListener('click', async () => {
+      if (!window.QRCode?.toCanvas || !window.QRCode?.toString) {
+        genStatus('QR Code 產生函式庫載入失敗，請檢查網路連線。', 'error');
+        return;
+      }
+      const ticket = ++lastGeneration;
+      $('generateButton').disabled = true;
+      try {
+        const payload = makePayload();
+        const settings = qrSettings();
+        const canvas = $('generatedCanvas');
+        await QRCode.toCanvas(canvas, payload, settings);
+        if (ticket !== lastGeneration) return;
+        generatedPayload = payload;
+        $('generatedText').value = payload;
+        canvas.style.display = 'block';
+        $('generatedPlaceholder').style.display = 'none';
+        for (const id of ['downloadPng', 'downloadSvg', 'copyGenerated', 'verifyGenerated']) $(id).disabled = false;
+        showVerification(payload);
+      } catch (err) {
+        if (ticket === lastGeneration) genStatus('產生失敗：' + (err.message || '內容過長或格式不正確。'), 'error');
+      } finally {
+        $('generateButton').disabled = false;
+      }
+    });
+    $('verifyGenerated').addEventListener('click', () => { if (generatedPayload !== null) showVerification(generatedPayload); });
+    function triggerDownload(blob, filename) {
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 30000);
+    }
+    $('downloadPng').addEventListener('click', () => {
+      if (generatedPayload === null) return;
+      $('generatedCanvas').toBlob(blob => {
+        if (blob) triggerDownload(blob, 'qrcode.png');
+        else genStatus('無法匯出 PNG 圖片。', 'error');
+      }, 'image/png');
+    });
+    $('downloadSvg').addEventListener('click', async () => {
+      if (generatedPayload === null) return;
+      try {
+        const svg = await QRCode.toString(generatedPayload, {...qrSettings(), type:'svg'});
+        triggerDownload(new Blob([svg], {type:'image/svg+xml;charset=utf-8'}), 'qrcode.svg');
+      } catch (err) { genStatus('SVG 匯出失敗：'+err.message, 'error'); }
+    });
+    $('copyGenerated').addEventListener('click', async () => {
+      if (generatedPayload === null) return;
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(generatedPayload);
+        else {
+          $('generatedText').focus(); $('generatedText').select();
+          if (!document.execCommand('copy')) throw new Error('複製失敗');
+        }
+        genStatus('已複製原始內容。', 'success');
+      } catch { genStatus('無法自動複製，請選取下方文字手動複製。', 'error'); }
     });
   </script>
 </body>
